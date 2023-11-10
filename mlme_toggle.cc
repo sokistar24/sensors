@@ -31,7 +31,7 @@ Ptr<LrWpanNetDevice> g_coordinatorDevice;
 
 static void SendPacket(Ptr<LrWpanNetDevice> device)
 {
-  if (numSentPackets < 20) 
+  if (numSentPackets < 200) 
   {
     Ptr<Packet> p = Create<Packet> (5);
     McpsDataRequestParams params;
@@ -108,15 +108,35 @@ static void StartConfirm (MlmeStartConfirmParams params)
     }
 }
 
+double lastTime = 0;  // Store the last time the throughput was calculated
+uint64_t lastBytes = 0;  // Store the last bytes received
+void CalculateThroughput() 
+{
+    double curTime = Simulator::Now().GetSeconds();
+    double timeDiff = curTime - lastTime;
+    uint64_t curBytes = numReceivedPackets; // Assuming this tracks the total received packets
+    uint64_t bytesDiff = curBytes - lastBytes;
+
+    double throughput = (bytesDiff * 8) / timeDiff; // Throughput in bits per second
+
+    // Print the current time and the calculated throughput
+    NS_LOG_UNCOND("Time: " << curTime << " seconds, Throughput: " << throughput << " bps");
+
+    lastTime = curTime;
+    lastBytes = curBytes;
+}
+
+
 void ToggleRadio()
 {
+    CalculateThroughput();
     Ptr<LrWpanMac> mac = g_coordinatorDevice->GetMac();
     bool currentState = mac->GetRxOnWhenIdle();
     
     mac->SetRxOnWhenIdle(!currentState);  // Toggle the current state
     
     // Schedule the next toggle in 5 seconds
-    Simulator::Schedule(ns3::Seconds(4.0), &ToggleRadio);
+    Simulator::Schedule(ns3::Seconds(5.0), &ToggleRadio);
 }
 
 
@@ -127,8 +147,8 @@ int main (int argc, char *argv[])
 
   LogComponentEnableAll (LOG_PREFIX_TIME);
   LogComponentEnableAll (LOG_PREFIX_FUNC);
-  LogComponentEnable ("LrWpanMac", LOG_LEVEL_INFO);
-  LogComponentEnable ("LrWpanCsmaCa", LOG_LEVEL_INFO);
+  //LogComponentEnable ("LrWpanMac", LOG_LEVEL_INFO);
+  //LogComponentEnable ("LrWpanCsmaCa", LOG_LEVEL_INFO);
 
 
   LrWpanHelper lrWpanHelper;
@@ -212,7 +232,7 @@ int main (int argc, char *argv[])
   MlmeStartRequestParams params;
   params.m_panCoor = true;
   params.m_PanId = 5;
-  params.m_bcnOrd = 10; //10
+  params.m_bcnOrd = 6; //10
   params.m_sfrmOrd = 6;
   Simulator::ScheduleWithContext (1, Seconds (1.6),
                                   &LrWpanMac::MlmeStartRequest,
